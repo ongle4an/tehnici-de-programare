@@ -1,0 +1,153 @@
+import requests
+
+SITES = [
+    "https://httpbin.org/html",
+    "https://httpbin.org/json",
+    "https://example.com",
+    "https://httpbin.org/status/404",
+    "https://httpbin.org/status/500",
+    "http://this-site-does-not-exist.invalid"
+]
+
+SECURITY_HEADERS = [
+    "Strict-Transport-Security",
+    "Content-Security-Policy",
+    "X-Frame-Options",
+    "X-Content-Type-Options"
+]
+
+
+# Partea 1
+def build_url(host, path):
+    return "https://" + host.rstrip("/") + "/" + path.lstrip("/")
+
+
+def is_https(url):
+    return url.startswith("https://")
+
+
+# Partea 2
+def show_response(url):
+    try:
+        response = requests.get(url, timeout=5)
+        print("Status:", response.status_code)
+        print("Content-Type:", response.headers.get("Content-Type", "unknown"))
+    except requests.RequestException as error:
+        print("Eroare:", str(error)[:100])
+
+
+# Partea 3
+def check_site(url):
+    try:
+        response = requests.get(url, timeout=5)
+        return {
+            "status": response.status_code,
+            "content_type": response.headers.get("Content-Type", "unknown"),
+            "length": len(response.content),
+            "server": response.headers.get("Server", "unknown")
+        }
+    except requests.RequestException as error:
+        return {"status": None, "error": str(error)[:100]}
+
+
+# Partea 4
+def scan_sites():
+    good_sites = []
+    failed = 0
+
+    for url in SITES:
+        result = check_site(url)
+
+        if result["status"] == 200:
+            good_sites.append((url, result["length"]))
+        else:
+            failed += 1
+
+    good_sites.sort(key=lambda site: site[1], reverse=True)
+
+    for url, length in good_sites:
+        print(url, "-> 200,", length, "octeti")
+
+    print("Reusite:", len(good_sites), "| Esuate:", failed)
+
+
+# Partea 5
+def check_headers(url):
+    try:
+        response = requests.get(url, timeout=5)
+        present = []
+        missing = []
+
+        received = [header.lower() for header in response.headers]
+
+        for header in SECURITY_HEADERS:
+            if header.lower() in received:
+                present.append(header)
+            else:
+                missing.append(header)
+
+        score = len(present) * 100 // len(SECURITY_HEADERS)
+
+        return {
+            "present": present,
+            "missing": missing,
+            "score": score
+        }
+
+    except requests.RequestException as error:
+        return {"status": None, "error": str(error)[:100]}
+
+
+# Partea 6
+def retry_check(url, attempts=3):
+    last_status = None
+    last_error = None
+    count = 0
+
+    for count in range(1, attempts + 1):
+        try:
+            response = requests.get(url, timeout=5)
+            last_status = response.status_code
+
+            if last_status < 500:
+                return {"status": last_status, "attempts": count}
+
+        except requests.RequestException as error:
+            last_error = str(error)[:100]
+
+    result = {"status": last_status, "attempts": count}
+
+    if last_status is None and last_error is not None:
+        result["error"] = last_error
+
+    return result
+
+
+# Testarea functiilor
+if name == "main":
+
+    print("Partea 1:")
+    print(build_url("example.com", "login"))
+    print(build_url("example.com", "/login"))
+    print(is_https("https://example.com"))
+    print(is_https("http://example.com"))
+
+    print("\nPartea 2:")
+    show_response("https://example.com")
+
+    print("\nPartea 3:")
+    print(check_site("https://example.com"))
+    print(check_site("http://this-site-does-not-exist.invalid"))
+
+    print("\nPartea 4:")
+    scan_sites()
+
+    print("\nPartea 5:")
+    print(check_headers("https://example.com"))
+    print(check_headers("https://httpbin.org/html"))
+
+    print("\nPartea 6:")
+    print(retry_check("https://httpbin.org/status/200"))
+    print(retry_check("https://httpbin.org/status/404"))
+    print(retry_check("https://httpbin.org/status/500", attempts=2))
+    print(retry_check("http://this-site-does-not-exist.invalid"))
